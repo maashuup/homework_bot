@@ -101,7 +101,6 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         logging.critical('Отсутствуют обязательные переменные окружения.')
         return
