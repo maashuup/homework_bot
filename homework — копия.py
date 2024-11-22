@@ -74,30 +74,57 @@ def get_api_answer(timestamp: int) -> dict[str, Any]:
         raise APIRequestError(f'Ошибка при запросе к API: {error}') from error
 
 
+class APIResponseNotDictError(Exception):
+    """Ответ API не является словарём."""
+    pass
+
+
+class APIResponseMissingKeysError(Exception):
+    """В ответе API отсутствуют обязательные ключи."""
+    pass
+
+
+class HomeworksNotListError(Exception):
+    """Ключ 'homeworks' должен содержать список."""
+    pass
+
+
+class HomeworkKeysError(Exception):
+    """Отсутствуют ожидаемые ключи в ответе API."""
+    pass
+
+
+class UnknownHomeworkStatusError(Exception):
+    """Неизвестный статус домашней работы."""
+    pass
+
+
 def check_response(response) -> list:
     """Проверяет ответ API на соответствие документации."""
     if not isinstance(response, dict):
-        # logging.error('Ответ API не является словарем.')
-        raise TypeError('Ответ API должен быть словарем.')
+        raise APIResponseNotDictError('Ответ API должен быть словарем.')
     if 'homeworks' not in response or 'current_date' not in response:
-        # logging.error('В ответе API отсутствуют ожидаемые ключи.')
-        raise KeyError('Отсутствуют обязательные ключи в ответе API.')
+        raise APIResponseMissingKeysError(
+            'Отсутствуют обязательные ключи в ответе API.'
+        )
     if not isinstance(response['homeworks'], list):
-        # logging.error('Домашние работы не представлены списком.')
-        raise TypeError('Значение ключа "homeworks" должно быть списком.')
+        raise HomeworksNotListError(
+            'Значение ключа "homeworks" должно быть списком.'
+        )
     return response['homeworks']
 
 
 def parse_status(homework: dict) -> str:
     """Извлекает статус работы из ответа API."""
     if 'homework_name' not in homework or 'status' not in homework:
-        raise KeyError('Отсутствуют ожидаемые ключи в ответе API.')
+        raise HomeworkKeysError('Отсутствуют ожидаемые ключи в ответе API.')
     homework_name = homework['homework_name']
     homework_status = homework['status']
 
     if homework_status not in HOMEWORK_VERDICTS:
-        # logging.error(f'Недокументированный статус работы: {homework_status}')
-        raise ValueError(f'Неизвестный статус работы: {homework_status}')
+        raise UnknownHomeworkStatusError(
+            f'Неизвестный статус работы: {homework_status}'
+        )
 
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -125,13 +152,29 @@ def main():
             f'{", ".join(missing_tokens)}'
         )
         sys.exit()
-
     while True:
         try:
             response = get_api_answer(timestamp)
-            homeworks = check_response(response)
+            try:
+                homeworks = check_response(response)
+            except (
+                APIResponseNotDictError,
+                APIResponseMissingKeysError,
+                HomeworksNotListError
+            ) as error:
+                logging.error(f'Ошибка в check_response: {error}')
+                raise
+
             if homeworks:
-                message = parse_status(homeworks[0])
+                try:
+                    message = parse_status(homeworks[0])
+                except (
+                    HomeworkKeysError,
+                    UnknownHomeworkStatusError
+                ) as error:
+                    logging.error(f'Ошибка в parse_status: {error}')
+                    raise
+
                 if message != last_status:
                     send_message(bot, message)
                     last_status = message
@@ -151,11 +194,39 @@ def main():
             logging.error(f'Сбой в работе программы: {error}')
             if last_error != str(error):
                 send_message(bot, message)
-                last_error = str(error)
-
+                last_error = str(error)    
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
     main()
+
+
+
+    # while True:
+    #     try:
+    #         response = get_api_answer(timestamp)
+    #         homeworks = check_response(response)
+    #         if homeworks:
+    #             message = parse_status(homeworks[0])
+    #             if message != last_status:
+    #                 send_message(bot, message)
+    #                 last_status = message
+    #                 timestamp = response.get('current_date', timestamp)
+    #             else:
+    #                 logging.debug(
+    #                     'Статус не изменился, сообщение не отправлено.'
+    #                 )
+    #         else:
+    #             logging.debug('В ответе нет домашних работ.')
+    #             send_message(bot, 'В ответе нет домашних работ.')
+    #         last_error = None
+    #     except APIRequestError as error:
+    #         logging.error(f'Ошибка при работе с API: {error}')
+    #     except Exception as error:
+    #         message = f'Сбой в работе программы: {error}'
+    #         logging.error(f'Сбой в работе программы: {error}')
+    #         if last_error != str(error):
+    #             send_message(bot, message)
+    #             last_error = str(error)
