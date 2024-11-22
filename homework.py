@@ -77,13 +77,10 @@ def get_api_answer(timestamp: int) -> dict[str, Any]:
 def check_response(response) -> list:
     """Проверяет ответ API на соответствие документации."""
     if not isinstance(response, dict):
-        # logging.error('Ответ API не является словарем.')
         raise TypeError('Ответ API должен быть словарем.')
     if 'homeworks' not in response or 'current_date' not in response:
-        # logging.error('В ответе API отсутствуют ожидаемые ключи.')
         raise KeyError('Отсутствуют обязательные ключи в ответе API.')
     if not isinstance(response['homeworks'], list):
-        # logging.error('Домашние работы не представлены списком.')
         raise TypeError('Значение ключа "homeworks" должно быть списком.')
     return response['homeworks']
 
@@ -96,7 +93,6 @@ def parse_status(homework: dict) -> str:
     homework_status = homework['status']
 
     if homework_status not in HOMEWORK_VERDICTS:
-        # logging.error(f'Недокументированный статус работы: {homework_status}')
         raise ValueError(f'Неизвестный статус работы: {homework_status}')
 
     verdict = HOMEWORK_VERDICTS[homework_status]
