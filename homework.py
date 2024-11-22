@@ -54,6 +54,7 @@ def send_message(bot: TeleBot, message: str) -> None:
 
 class APIRequestError(Exception):
     """Исключение для ошибок при работе с API."""
+
     pass
 
 
