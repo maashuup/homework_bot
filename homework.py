@@ -2,13 +2,13 @@ import logging
 import os
 import sys
 import time
-
 from http import HTTPStatus
-from dotenv import load_dotenv
+from typing import Any, List
+
 import requests
+from dotenv import load_dotenv
 from telebot import TeleBot
 from telebot.apihelper import ApiException
-from typing import List, Any
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -36,26 +36,25 @@ def check_tokens() -> List[str]:
     return missing_tokens
 
 
-def send_message(bot: TeleBot, message: str) -> None:
-    """Отправляет сообщение в Telegram."""
-    try:
-        logging.info(f'Отправка сообщения {message}')
-        bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug(f'Сообщение успешно отправлено: {message}')
-    except ApiException as error:
-        raise RuntimeError(f'Ошибка при отправке сообщения: {error}')
-    except requests.exceptions.RequestException as error:
-        raise RuntimeError(f'Ошибка при запросе: {error}')
-    else:
-        logging.debug(
-            f'Бот успешно отправил сообщение: {message}'
-        )
+class SendMessageError(Exception):
+    """Исключение для ошибок при отправке сообщения в Telegram."""
 
 
 class APIRequestError(Exception):
     """Исключение для ошибок при работе с API."""
 
-    pass
+
+def send_message(bot: TeleBot, message: str) -> None:
+    """Отправляет сообщение в Telegram."""
+    try:
+        logging.info(f'Отправка сообщения {message}')
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+    except (ApiException, requests.exceptions.RequestException) as error:
+        raise SendMessageError(f'Ошибка при отправке сообщения: {error}')
+    else:
+        logging.debug(
+            f'Бот успешно отправил сообщение: {message}'
+        )
 
 
 def get_api_answer(timestamp: int) -> dict[str, Any]:
@@ -102,18 +101,11 @@ def parse_status(homework: dict) -> str:
 
 def main():
     """Основная логика работы бота."""
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s, %(levelname)s, %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
-
     load_dotenv()
 
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    last_error = None
-    last_status = None
+    last_message = None
 
     missing_tokens = check_tokens()
     if missing_tokens:
@@ -127,32 +119,34 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if homeworks:
-                message = parse_status(homeworks[0])
-                if message != last_status:
-                    send_message(bot, message)
-                    last_status = message
-                    timestamp = response.get('current_date', timestamp)
-                else:
-                    logging.debug(
-                        'Статус не изменился, сообщение не отправлено.'
-                    )
-            else:
-                logging.debug('В ответе нет домашних работ.')
-                send_message(bot, 'В ответе нет домашних работ.')
-            last_error = None
-        except APIRequestError as error:
-            logging.error(f'Ошибка при работе с API: {error}')
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logging.error(f'Сбой в работе программы: {error}')
-            if last_error != str(error):
+            message = (
+                parse_status(homeworks[0])
+                if homeworks
+                else 'В ответе нет домашних работ.'
+            )
+            logging.debug(message)
+            if message != last_message:
                 send_message(bot, message)
-                last_error = str(error)
-
+                last_message = message
+                timestamp = response.get('current_date', timestamp)
+            else:
+                logging.debug(
+                    'Статус не изменился, сообщение не отправлено.'
+                )
+        except Exception as error:
+            error_message = f'Сбой в работе программы: {error}'
+            logging.error(error_message)
+            if error_message != last_message:
+                send_message(bot, error_message)
+                last_message = error_message
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s, %(levelname)s, %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
     main()
