@@ -124,21 +124,20 @@ def main():
                 if homeworks
                 else 'В ответе нет домашних работ.'
             )
-            logging.debug(message)
             if message != last_message:
-                send_message(bot, message)
-                last_message = message
-                timestamp = response.get('current_date', timestamp)
-            else:
-                logging.debug(
-                    'Статус не изменился, сообщение не отправлено.'
-                )
+                if send_message(bot, message):
+                    last_message = message
+                    timestamp = response.get('current_date', timestamp)
+                else:
+                    logging.debug(
+                        'Статус не изменился, сообщение не отправлено.'
+                    )
         except Exception as error:
             error_message = f'Сбой в работе программы: {error}'
             logging.error(error_message)
             if error_message != last_message:
-                send_message(bot, error_message)
-                last_message = error_message
+                if send_message(bot, error_message):
+                    last_message = error_message
         finally:
             time.sleep(RETRY_PERIOD)
 
