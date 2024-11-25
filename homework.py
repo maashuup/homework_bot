@@ -125,9 +125,14 @@ def main():
                 else 'В ответе нет домашних работ.'
             )
             if message != last_message:
-                if send_message(bot, message):
+                try:
+                    send_message(bot, message)
                     last_message = message
                     timestamp = response.get('current_date', timestamp)
+                except Exception as send_error:
+                    logging.error(
+                        f'Не удалось отправить сообщение: {send_error}'
+                    )
                 else:
                     logging.debug(
                         'Статус не изменился, сообщение не отправлено.'
@@ -136,8 +141,13 @@ def main():
             error_message = f'Сбой в работе программы: {error}'
             logging.error(error_message)
             if error_message != last_message:
-                if send_message(bot, error_message):
+                try:
+                    send_message(bot, error_message)
                     last_message = error_message
+                except Exception as send_error:
+                    logging.error(
+                        f'Не удалось отправить сообщение: {send_error}'
+                    )
         finally:
             time.sleep(RETRY_PERIOD)
 
