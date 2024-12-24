@@ -18,7 +18,7 @@ Python Telegram Bot для проверки статусов домашних з
 
 1. Клонируйте репозиторий:
    bash
-   git clone https://github.com/ваш_репозиторий/homework_bot.git
+   git clone https://github.com/maashuup/homework_bot.git
    cd homework_bot
 
 2. Установите зависимости:
